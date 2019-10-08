@@ -1,17 +1,17 @@
 ﻿using System;
 using System.Text;
+using System.Text.Json;
+using Core;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using RabbitMQ.Client.Framing;
+using Server;
 
 namespace Client
 {
     public class Client
     {
-        private const string IRCloneServer = "irclone_server";
-        private const string IRCloneClient = "irclone_client";
-
-        public static void Main(string[] args)
+        public static void Main()
         {
             var factory = new ConnectionFactory { HostName = "localhost" };
 
@@ -21,8 +21,8 @@ namespace Client
                 Console.WriteLine("Your username: ");
                 var username = Console.ReadLine();
 
-                channel.ExchangeDeclare(IRCloneServer, ExchangeType.Direct);
-                channel.ExchangeDeclare(IRCloneClient, ExchangeType.Fanout);
+                channel.ExchangeDeclare(IRCloneConstants.Exchanges.ServerExchangeName, ExchangeType.Direct);
+                channel.ExchangeDeclare(IRCloneConstants.Exchanges.ClientExchangeName, ExchangeType.Fanout);
                 var queueName = channel.QueueDeclare().QueueName;
 
                 var basicProperties = new BasicProperties
@@ -31,7 +31,7 @@ namespace Client
                 };
 
                 channel.BasicPublish(
-                    exchange: IRCloneServer,
+                    exchange: IRCloneConstants.Exchanges.ServerExchangeName,
                     routingKey: "user_joined",
                     basicProperties: basicProperties,
                     body: Encoding.UTF8.GetBytes(username)
@@ -40,7 +40,7 @@ namespace Client
 
                 channel.QueueBind(
                     queue: queueName,
-                    exchange: "irclone_client",
+                    exchange: IRCloneConstants.Exchanges.ClientExchangeName,
                     routingKey: ""
                 );
 
@@ -57,9 +57,25 @@ namespace Client
                     consumer: consumer
                 );
 
-                Console.ReadLine();
-            }
                 
+
+                while (true)
+                {
+                    var chatLine = Console.ReadLine();
+
+                    var body = JsonSerializer.Serialize(new ChatMessageDto {
+                        Username = username,
+                        Message = chatLine
+                    });
+
+                    channel.BasicPublish(
+                        exchange: IRCloneConstants.Exchanges.ServerExchangeName,
+                        routingKey: "user_chatted",
+                        basicProperties: basicProperties,
+                        body: Encoding.UTF8.GetBytes(body)
+                    );
+                }
+            }
         }
     }
 }
