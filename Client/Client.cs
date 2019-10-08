@@ -37,18 +37,25 @@ namespace Client
                     body: Encoding.UTF8.GetBytes(username)
                 );
 
-
                 channel.QueueBind(
                     queue: queueName,
                     exchange: IRCloneConstants.Exchanges.ClientExchangeName,
                     routingKey: ""
                 );
 
+                var currentChatLine = "";
+
                 var consumer = new EventingBasicConsumer(channel);
                 consumer.Received += (model, ea) =>
                 {
                     var message = Encoding.UTF8.GetString(ea.Body);
+                    var currentChatLineLength = currentChatLine.Length;
+                    Console.CursorLeft = 0;
+                    Console.Write(new string(' ', currentChatLineLength));
+                    Console.CursorLeft = 0;
+
                     Console.WriteLine(message);
+                    Console.Write(currentChatLine);
                 };
 
                 channel.BasicConsume(
@@ -61,12 +68,50 @@ namespace Client
 
                 while (true)
                 {
-                    var chatLine = Console.ReadLine();
+                    while (true)
+                    {
+                        // Turns out console apps can be a bit finnicky!
+                        var input = Console.ReadKey();
+
+                        switch (input.Key)
+                        {
+                            case ConsoleKey.LeftArrow:
+                                Console.SetCursorPosition(Math.Max(0, Console.CursorLeft - 1), Console.CursorTop);
+                                break;
+                            case ConsoleKey.RightArrow:
+                                Console.CursorLeft = Math.Min(Console.CursorLeft + 1, currentChatLine.Length);
+                                break;
+                            case ConsoleKey.Backspace:
+                                currentChatLine = currentChatLine.Substring(0, Math.Max(currentChatLine.Length - 1, 0));
+                                Console.CursorLeft = 0;
+                                Console.Write(currentChatLine + ' ');
+                                Console.CursorLeft--;
+                                break;
+                            default:
+                            {
+                                if (char.IsLetterOrDigit(input.KeyChar) ||
+                                    char.IsWhiteSpace(input.KeyChar) ||
+                                    char.IsPunctuation(input.KeyChar))
+                                {
+                                    currentChatLine += input.KeyChar;
+                                }
+
+                                break;
+                            }
+                        }
+
+                        if (input.Key == ConsoleKey.Enter) 
+                        {
+                            break;
+                        }
+                    }
 
                     var body = JsonSerializer.Serialize(new ChatMessageDto {
                         Username = username,
-                        Message = chatLine
+                        Message = currentChatLine
                     });
+
+                    currentChatLine = "";
 
                     channel.BasicPublish(
                         exchange: IRCloneConstants.Exchanges.ServerExchangeName,
