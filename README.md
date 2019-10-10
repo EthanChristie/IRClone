@@ -2,5 +2,7 @@ IRClone
 
 C# Console chat application that utilises RabbitMq
 
-Client -> Server: Direct Exchange
-Server -> Clients: Fanout Exchange
+Communication | Exchange type
+------------ | -------------
+Client > Server | Direct Exchange
+Server > Client | Fanout Exchange
